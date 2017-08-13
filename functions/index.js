@@ -26,7 +26,7 @@ exports.addMessage = functions.https.onRequest((req, res) => {
   });
 
 
-  
+
 //here we will add the push notifications to all the relevant professionals once the apn works. 
 // exports.onOrderRequestReceived = functions.database.ref('/OrdersPros/{orderRequestId}')
 // .onWrite(event => {
@@ -70,7 +70,7 @@ exports.incomingOrderRequest = functions.database.ref('/OrderRequest/Users/{user
     });
 });
 
-  exports.incomingOrderRequestNotification = functions.database.ref('/OrderRequest/Users/{userId}/{orderRequestId}')
+  exports.incomingOrderRequestNotification = functions.database.ref('/OrderPros/{orderRequestId}')
   .onWrite(event => {
         const snapshot = event.data;
         if(snapshot.previous.val())
@@ -105,3 +105,16 @@ exports.incomingOrderRequest = functions.database.ref('/OrderRequest/Users/{user
             }
         });
   });
+
+  function loadProfessionalsForPush(prosIds){
+      let dbRef = admin.database().ref('/professionals');
+      let defer = new Promise((resolve, reject)=> {
+        dbRef.once('value', (snap)=>{
+            let data = snap.val();
+            let pros = [];
+            for(var pro in data){
+                pros.push(data)
+            }
+        });
+      });
+  }
