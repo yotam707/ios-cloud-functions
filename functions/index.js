@@ -70,6 +70,51 @@ exports.incomingOrderRequest = functions.database.ref('/OrderRequest/Users/{user
     });
 });
 
+exports.incomingOrderNotification = functions.database.ref('/OrdersPros/{orderRequestId}')
+.onWrite(event => {
+    const snapshot = event.data;
+    // if(snapshot.previous.val())
+    //     return;
+
+    const orderRequestId = event.params.orderRequestId;
+    const proIds = event.data.val();
+    console.log(proIds);
+    let professionalIds = []
+    let professionalPushTokens = []
+    
+    proIds.forEach((res, index)=>{
+        professionalIds.push(res.proId);
+        event.data.ref.root.child('Users/'+res.proId).once('value').then(professionals => {
+            if(professionals.val()){
+                console.log("this is the professionals:", professionals.val())
+                professionalPushTokens.push(professionals.val().pushToken);
+            }
+        })
+        .then(()=>{
+            console.log("professionalPushTokens are ", professionalPushTokens);
+            const payLoad = {
+                notification: {
+                    title:`this is a test notification`,
+                    body: 'This is a test notification sent by firebase cloud functions if you see this it means that I am awesome'
+                }
+            };
+            // const tokens = Object.keys(professionalPushTokens);
+            // console.log("this are the tokens ", tokens);
+            return admin.messaging().sendToDevice(professionalPushTokens,payLoad).then(response =>{
+                console.log("Successfully sent message:", response);                
+            })
+            .catch(function (error) {
+                console.log("Error sending message:", error);
+            });
+            
+        })
+    });
+    
+    
+    console.log(event.data.val());
+});
+
+
   exports.incomingOrderRequestNotification = functions.database.ref('/OrderPros/{orderRequestId}')
   .onWrite(event => {
         const snapshot = event.data;
