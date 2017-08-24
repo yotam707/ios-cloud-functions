@@ -34,24 +34,38 @@ exports.addMessage = functions.https.onRequest((req, res) => {
     
 // });
 
-exports.incomingOrderRequest = functions.database.ref('/OrderRequest/Users/{userId}/{orderRequestId}')
+
+
+exports.incomingOrderRequest = functions.database.ref('/OrderRequest/{orderRequestId}')
 .onWrite(event => {
     console.log(event.params);
     const snapshot = event.data;
     const uid = event.params.orderRequestId;
+    console.log(event.data.val());
+    const requestUserId = event.data.val().userId;
     let availablePros = [];
     let OrderReqPros =[];
     if(snapshot.previous.val())
         return;
     const OrderProsRef = event.data.ref.root.child('/OrdersPros/'+uid);
 
-    event.data.ref.root.child('professionals').once('value').then(professionals => {
-        if(professionals.val()){      
-            professionals.val().forEach((pro, index)=> {
-                console.log(pro)
-                if(pro.active)
-                    availablePros.push(pro.id);
+    admin.database().ref('professionals').once('value').then(professionals => {
+        console.log("start professionals: ",professionals.val());
+        if(professionals.val()){   
+            console.log("professionals are: ",professionals.val())
+            var proKeys  = Object.keys(professionals.val());
+            var pros = Object.keys(professionals.val()).map(function(key){
+                return professionals.val()[key];
             });
+
+            pros.forEach((pro, index)=> {
+                console.log(pro, index)
+                if(pro.active)
+                    availablePros.push(proKeys[index]);
+                });
+
+                console.log("available pros:", availablePros);
+          
         }else{
             console.log("no professionals available");
         }
@@ -63,11 +77,22 @@ exports.incomingOrderRequest = functions.database.ref('/OrderRequest/Users/{user
         availablePros.forEach((aPro, index)=> {
             OrderReqPros.push({
                 proId: aPro,
-                timestamp: new Date().toString()
+                timestamp: new Date().toString(),
+                userId : requestUserId
             });
         });
         return OrderProsRef.set(OrderReqPros);
     });
+});
+//need to change it to onCreate in real life app
+exports.onProfessionalApprovedOrderRequest = functions.database.ref('OrderRequestApproved/{orderRequestId}')
+.onWrite(event => {
+    const snapshot = event.data;
+    const dataVal = event.data.val();
+    const orderRequestId = event.params.orderRequestId;
+    console.log(orderRequestId, snapshot, dataVal);
+
+
 });
 
 exports.incomingOrderNotification = functions.database.ref('/OrdersPros/{orderRequestId}')
@@ -81,7 +106,12 @@ exports.incomingOrderNotification = functions.database.ref('/OrdersPros/{orderRe
     console.log(proIds);
     let professionalIds = []
     let professionalPushTokens = []
-    
+    // event.data.ref.root.child('/OrderRequest/'+orderRequestId).once('value').then(users=>{
+    //     if(users.val()){
+    //         console.log("the users are:", users);
+    //     }
+    // });
+
     proIds.forEach((res, index)=>{
         professionalIds.push(res.proId);
         event.data.ref.root.child('Users/'+res.proId).once('value').then(professionals => {
@@ -95,7 +125,8 @@ exports.incomingOrderNotification = functions.database.ref('/OrdersPros/{orderRe
             const payLoad = {
                 notification: {
                     title:`this is a test notification`,
-                    body: 'This is a test notification sent by firebase cloud functions if you see this it means that I am awesome'
+                    body: 'This is a test notification sent by firebase cloud functions if you see this it means that I am awesome',
+                    click_action: `https://${functions.config().firebase.authDomain}/orderRequest/${orderRequestId}`
                 }
             };
             // const tokens = Object.keys(professionalPushTokens);
