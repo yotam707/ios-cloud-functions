@@ -60,8 +60,10 @@ exports.incomingOrderRequest = functions.database.ref('/OrderRequest/{orderReque
 
             pros.forEach((pro, index)=> {
                 console.log(pro, index)
-                if(pro.active)
-                    availablePros.push(proKeys[index]);
+                    if(pro.status){
+                        pro.key = proKeys[index];
+                        availablePros.push(pro);
+                    }
                 });
 
                 console.log("available pros:", availablePros);
@@ -76,7 +78,10 @@ exports.incomingOrderRequest = functions.database.ref('/OrderRequest/{orderReque
         }
         availablePros.forEach((aPro, index)=> {
             OrderReqPros.push({
-                proId: aPro,
+                proId: aPro.key,
+                proName: aPro.name || "john-doe",
+                proRating: aPro.rating || 0,
+                proImage: aPro.imageUrl || "",
                 timestamp: new Date().toString(),
                 userId : requestUserId
             });
@@ -98,50 +103,40 @@ exports.onProfessionalApprovedOrderRequest = functions.database.ref('OrderReques
 exports.incomingOrderNotification = functions.database.ref('/OrdersPros/{orderRequestId}')
 .onWrite(event => {
     const snapshot = event.data;
-    // if(snapshot.previous.val())
-    //     return;
-
     const orderRequestId = event.params.orderRequestId;
     const proIds = event.data.val();
     console.log(proIds);
     let professionalIds = []
     let professionalPushTokens = []
-    // event.data.ref.root.child('/OrderRequest/'+orderRequestId).once('value').then(users=>{
-    //     if(users.val()){
-    //         console.log("the users are:", users);
-    //     }
-    // });
-
+    var promises = []
     proIds.forEach((res, index)=>{
         professionalIds.push(res.proId);
-        event.data.ref.root.child('Users/'+res.proId).once('value').then(professionals => {
+        promises.push(event.data.ref.root.child('professionals/'+res.proId).once('value').then(professionals => {
             if(professionals.val()){
                 console.log("this is the professionals:", professionals.val())
                 professionalPushTokens.push(professionals.val().pushToken);
             }
-        })
-        .then(()=>{
-            console.log("professionalPushTokens are ", professionalPushTokens);
-            const payLoad = {
-                notification: {
-                    title:`this is a test notification`,
-                    body: 'This is a test notification sent by firebase cloud functions if you see this it means that I am awesome',
-                    click_action: `https://${functions.config().firebase.authDomain}/orderRequest/${orderRequestId}`
-                }
-            };
-            // const tokens = Object.keys(professionalPushTokens);
-            // console.log("this are the tokens ", tokens);
-            return admin.messaging().sendToDevice(professionalPushTokens,payLoad).then(response =>{
-                console.log("Successfully sent message:", response);                
-            })
-            .catch(function (error) {
-                console.log("Error sending message:", error);
-            });
-            
-        })
+        }))
     });
-    
-    
+    Promise.all(promises).then(()=>{
+        console.log("professionalPushTokens are ", professionalPushTokens);
+        const payLoad = {
+            notification: {
+                title:`this is a test notification`,
+                body: 'This is a test notification sent by firebase cloud functions if you see this it means that I am awesome',
+                click_action: `https://${functions.config().firebase.authDomain}/orderRequest/${orderRequestId}`
+            }
+        };
+        // const tokens = Object.keys(professionalPushTokens);
+        // console.log("this are the tokens ", tokens);
+        return admin.messaging().sendToDevice(professionalPushTokens,payLoad).then(response =>{
+            console.log("Successfully sent message:", response);                
+        })
+        .catch(function (error) {
+            console.log("Error sending message:", error);
+        });
+        
+    }); 
     console.log(event.data.val());
 });
 
