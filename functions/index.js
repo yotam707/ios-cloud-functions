@@ -48,7 +48,7 @@ exports.incomingOrderRequest = functions.database.ref('/OrderRequest/{orderReque
     if(snapshot.previous.val())
         return;
     const OrderProsRef = event.data.ref.root.child('/OrdersPros/'+uid);
-
+    const PendingOrdersPros = event.data.ref.root.child('/PendingOrderPros');
     admin.database().ref('professionals').once('value').then(professionals => {
         console.log("start professionals: ",professionals.val());
         if(professionals.val()){   
@@ -77,6 +77,16 @@ exports.incomingOrderRequest = functions.database.ref('/OrderRequest/{orderReque
             return;
         }
         availablePros.forEach((aPro, index)=> {
+            OrderPendingPro = {
+                userId : requestUserId,
+                userName: event.data.val().userName,
+                userImageUrl: event.data.val().userImageUrl,
+                problemDescription: event.data.val().problemDescription,
+                requestDate:  event.data.val().requestDate
+            }
+            console.log("pending pro is:", OrderPendingPro);
+            PendingOrdersPros.child(aPro.key).child(uid).set(OrderPendingPro);
+            console.log("updated pending order Pro");
             OrderReqPros.push({
                 proId: aPro.key,
                 proName: aPro.name || "john-doe",
@@ -122,8 +132,8 @@ exports.incomingOrderNotification = functions.database.ref('/OrdersPros/{orderRe
         console.log("professionalPushTokens are ", professionalPushTokens);
         const payLoad = {
             notification: {
-                title:`this is a test notification`,
-                body: 'This is a test notification sent by firebase cloud functions if you see this it means that I am awesome',
+                title:`Get-Pro-App`,
+                body: 'You have a new Service request!',
                 click_action: `https://${functions.config().firebase.authDomain}/orderRequest/${orderRequestId}`
             }
         };
